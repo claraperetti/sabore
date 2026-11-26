@@ -1,13 +1,20 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../data/receitas_exemplo.dart';
+import '../models/receita.dart';
+import '../state/favoritos.dart';
 import '../theme.dart';
 import '../utils/validacao.dart';
+import '../widgets/cartao_receita.dart';
+import 'detalhes_page.dart';
+import 'favoritos_page.dart';
 
-/// Tela principal do Saborê.
+/// Tela principal: pesquisa + listagem de receitas.
 ///
-/// Atividade 02: agora a tela tem estado (StatefulWidget), porque
-/// precisa lembrar o termo pesquisado e os resultados.
+/// Atividade 03: ao abrir, mostra todas as receitas (provisórias).
+/// Tocar numa receita abre os detalhes; o coração no topo abre os
+/// favoritos. Como esta tela continua viva por baixo enquanto as
+/// outras estão abertas, a pesquisa não se perde ao voltar.
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -23,11 +30,11 @@ class _HomePageState extends State<HomePage> {
   // O focusNode permite colocar o cursor de volta no campo.
   final _foco = FocusNode();
 
-  // Termo da última pesquisa válida. null = nenhuma pesquisa feita.
+  // Termo da última pesquisa válida. null = mostrando todas.
   String? _termoPesquisado;
-  List<String> _resultados = [];
-  // Depois da primeira tentativa, o erro é revalidado enquanto a
-  // pessoa digita, e some assim que o texto fica válido.
+  List<Receita> _receitas = receitasExemplo;
+  // Depois da primeira tentativa inválida, o erro é revalidado
+  // enquanto a pessoa digita e some assim que o texto fica válido.
   AutovalidateMode _autoValidar = AutovalidateMode.disabled;
 
   void _pesquisar() {
@@ -42,7 +49,7 @@ class _HomePageState extends State<HomePage> {
     FocusScope.of(context).unfocus(); // fecha o teclado
     setState(() {
       _termoPesquisado = termo;
-      _resultados = buscarReceitasExemplo(termo);
+      _receitas = buscarReceitasExemplo(termo);
     });
   }
 
@@ -50,10 +57,23 @@ class _HomePageState extends State<HomePage> {
     _controller.clear();
     setState(() {
       _termoPesquisado = null;
-      _resultados = [];
+      _receitas = receitasExemplo;
       _autoValidar = AutovalidateMode.disabled;
     });
     _foco.requestFocus();
+  }
+
+  void _abrirDetalhes(Receita receita) {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DetalhesPage(receita: receita)),
+    );
+  }
+
+  void _abrirFavoritos() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const FavoritosPage()));
   }
 
   @override
@@ -67,61 +87,167 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
-    final termo = _termoPesquisado;
+    final quantidadeFavoritas = FavoritosScope.of(context).quantidade;
 
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
-          children: [
-            const _Marca(),
-            const SizedBox(height: 24),
-            Text('Saborê', style: textos.displaySmall),
-            const SizedBox(height: 8),
-            Text(
-              'Receitas para o dia a dia, do jeito que você gosta.',
-              style: textos.bodyLarge,
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverList.list(
+                children: [
+                  _Cabecalho(
+                    quantidadeFavoritas: quantidadeFavoritas,
+                    aoAbrirFavoritos: _abrirFavoritos,
+                  ),
+                  const SizedBox(height: 20),
+                  const _Destaque(),
+                  const SizedBox(height: 16),
+                  _FormularioPesquisa(
+                    formKey: _formKey,
+                    controller: _controller,
+                    foco: _foco,
+                    autoValidar: _autoValidar,
+                    aoPesquisar: _pesquisar,
+                  ),
+                  const SizedBox(height: 24),
+                  _TituloLista(
+                    termo: _termoPesquisado,
+                    quantidade: _receitas.length,
+                    aoNovaBusca: _novaBusca,
+                  ),
+                  const SizedBox(height: 12),
+                  const _AvisoProvisorio(),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            const _Destaque(),
-            const SizedBox(height: 20),
-            _FormularioPesquisa(
-              formKey: _formKey,
-              controller: _controller,
-              foco: _foco,
-              autoValidar: _autoValidar,
-              aoPesquisar: _pesquisar,
-            ),
-            const SizedBox(height: 28),
-            if (termo == null) ...[
-              Text('O que você encontra aqui', style: textos.titleLarge),
-              const SizedBox(height: 16),
-              const _Recurso(
-                icone: Icons.search_rounded,
-                titulo: 'Pesquise pelo nome',
-                descricao: 'Digite o nome de um prato e encontre a receita.',
-              ),
-              const SizedBox(height: 12),
-              const _Recurso(
-                icone: Icons.menu_book_rounded,
-                titulo: 'Ingredientes e preparo',
-                descricao: 'Veja o que separar e o passo a passo da receita.',
-              ),
-              const SizedBox(height: 12),
-              const _Recurso(
-                icone: Icons.favorite_rounded,
-                titulo: 'Guarde as favoritas',
-                descricao: 'Marque as receitas que você quer fazer de novo.',
-              ),
-            ] else
-              _ResultadoPesquisa(
-                termo: termo,
-                resultados: _resultados,
-                aoNovaBusca: _novaBusca,
+            if (_receitas.isEmpty)
+              SliverToBoxAdapter(
+                child: _SemResultados(termo: _termoPesquisado ?? ''),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                sliver: SliverList.separated(
+                  itemCount: _receitas.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, i) => CartaoReceita(
+                    receita: _receitas[i],
+                    aoTocar: () => _abrirDetalhes(_receitas[i]),
+                  ),
+                ),
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Logo, nome do app e botão de favoritos com contador.
+class _Cabecalho extends StatelessWidget {
+  const _Cabecalho({
+    required this.quantidadeFavoritas,
+    required this.aoAbrirFavoritos,
+  });
+
+  final int quantidadeFavoritas;
+  final VoidCallback aoAbrirFavoritos;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.terracota,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(
+            Icons.restaurant_rounded,
+            color: AppColors.creme,
+            size: 26,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Saborê',
+                style: textos.displaySmall?.copyWith(fontSize: 28),
+              ),
+              Text('Receitas para o dia a dia', style: textos.bodyMedium),
+            ],
+          ),
+        ),
+        IconButton.filledTonal(
+          key: const Key('botaoFavoritos'),
+          tooltip: 'Minhas favoritas',
+          onPressed: aoAbrirFavoritos,
+          icon: Badge(
+            isLabelVisible: quantidadeFavoritas > 0,
+            label: Text('$quantidadeFavoritas'),
+            child: const Icon(Icons.favorite_rounded),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Faixa de destaque com uma frase de boas-vindas.
+class _Destaque extends StatelessWidget {
+  const _Destaque();
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.terracota, AppColors.terracotaEscuro],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'O que vamos cozinhar hoje?',
+                  style: textos.titleLarge?.copyWith(color: AppColors.creme),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Centenas de receitas do mundo todo em um só lugar.',
+                  style: textos.bodyMedium?.copyWith(
+                    color: AppColors.creme.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Icon(
+            Icons.soup_kitchen_rounded,
+            color: AppColors.acafrao,
+            size: 48,
+          ),
+        ],
       ),
     );
   }
@@ -194,204 +320,116 @@ class _FormularioPesquisa extends StatelessWidget {
   }
 }
 
-/// Mostra o termo pesquisado, os resultados provisórios e o botão
-/// para fazer outra busca.
-class _ResultadoPesquisa extends StatelessWidget {
-  const _ResultadoPesquisa({
+/// Título da lista: "Todas as receitas" ou o termo pesquisado,
+/// com o botão para fazer nova busca.
+class _TituloLista extends StatelessWidget {
+  const _TituloLista({
     required this.termo,
-    required this.resultados,
+    required this.quantidade,
     required this.aoNovaBusca,
   });
 
-  final String termo;
-  final List<String> resultados;
+  final String? termo;
+  final int quantidade;
   final VoidCallback aoNovaBusca;
 
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
-    final quantidade = resultados.length;
+    final termo = this.termo;
+
+    if (termo == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Todas as receitas', style: textos.titleLarge),
+          const SizedBox(height: 4),
+          Text('$quantidade receitas para explorar.', style: textos.bodyMedium),
+        ],
+      );
+    }
+
     final resumo = switch (quantidade) {
       0 => 'Nenhuma receita encontrada.',
       1 => '1 receita encontrada.',
       _ => '$quantidade receitas encontradas.',
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
-        Text('Você pesquisou: “$termo”', style: textos.titleLarge),
-        const SizedBox(height: 4),
-        Text(resumo, style: textos.bodyMedium),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.acafrao.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            'Resultados de exemplo. A busca real chega na versão final.',
-            style: textos.bodyMedium?.copyWith(color: AppColors.tinta),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Você pesquisou: “$termo”', style: textos.titleLarge),
+              const SizedBox(height: 4),
+              Text(resumo, style: textos.bodyMedium),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        if (quantidade == 0)
-          Text(
-            'Tente outro nome, como “bolo” ou “frango”.',
-            style: textos.bodyLarge,
-          )
-        else
-          for (final nome in resultados) ...[
-            Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.restaurant_menu_rounded,
-                  color: AppColors.terracota,
-                ),
-                title: Text(nome, style: textos.titleMedium),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
+        const SizedBox(width: 8),
+        TextButton.icon(
           key: const Key('botaoNovaBusca'),
           onPressed: aoNovaBusca,
           icon: const Icon(Icons.refresh_rounded),
-          label: const Text('Fazer nova busca'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            foregroundColor: AppColors.terracota,
-            side: const BorderSide(color: AppColors.terracota),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+          label: const Text('Nova busca'),
         ),
       ],
     );
   }
 }
 
-/// Símbolo do app: um prato estilizado em terracota.
-class _Marca extends StatelessWidget {
-  const _Marca();
+/// Aviso de que os dados ainda são de exemplo.
+class _AvisoProvisorio extends StatelessWidget {
+  const _AvisoProvisorio();
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          color: AppColors.terracota,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Icon(
-          Icons.restaurant_rounded,
-          color: AppColors.creme,
-          size: 34,
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.acafrao.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        'Receitas de exemplo. As receitas reais chegam na versão final.',
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: AppColors.tinta),
       ),
     );
   }
 }
 
-/// Faixa de destaque com uma frase de boas-vindas.
-class _Destaque extends StatelessWidget {
-  const _Destaque();
+/// Mensagem para pesquisa sem resultados.
+class _SemResultados extends StatelessWidget {
+  const _SemResultados({required this.termo});
+
+  final String termo;
 
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.terracota, AppColors.terracotaEscuro],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+      child: Column(
+        key: const Key('semResultados'),
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'O que vamos cozinhar hoje?',
-                  style: textos.titleLarge?.copyWith(color: AppColors.creme),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Centenas de receitas do mundo todo em um só lugar.',
-                  style: textos.bodyMedium?.copyWith(
-                    color: AppColors.creme.withValues(alpha: 0.85),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
           const Icon(
-            Icons.soup_kitchen_rounded,
-            color: AppColors.acafrao,
-            size: 48,
+            Icons.search_off_rounded,
+            size: 56,
+            color: AppColors.terracota,
+          ),
+          const SizedBox(height: 12),
+          Text('Nenhuma receita encontrada', style: textos.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Não achamos receitas com “$termo”. Confira a grafia ou '
+            'tente outro nome, como “bolo” ou “frango”.',
+            style: textos.bodyMedium,
+            textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Cartão que descreve um recurso do app.
-class _Recurso extends StatelessWidget {
-  const _Recurso({
-    required this.icone,
-    required this.titulo,
-    required this.descricao,
-  });
-
-  final IconData icone;
-  final String titulo;
-  final String descricao;
-
-  @override
-  Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.acafrao.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icone, color: AppColors.terracota),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(titulo, style: textos.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(descricao, style: textos.bodyMedium),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
