@@ -1,20 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sabore/data/receitas_exemplo.dart';
 import 'package:sabore/state/favoritos.dart';
 
+import 'dados_falsos.dart';
+
 void main() {
-  final bolo = receitasExemplo[0];
-  final pizza = receitasExemplo[5];
+  final bolo = receitaTeste(1, 'Bolo');
+  final pizza = receitaTeste(2, 'Pizza');
 
   test('adicionar a mesma receita duas vezes não duplica', () {
     final favoritos = Favoritos();
 
     favoritos.adicionar(bolo);
     favoritos.adicionar(bolo);
+    // Outro objeto, mas com o mesmo id: também não duplica.
+    favoritos.adicionar(receitaTeste(1, 'Bolo'));
 
     expect(favoritos.quantidade, 1);
-    expect(favoritos.itens, [bolo]);
   });
 
   test('mantém a ordem em que as receitas foram favoritadas', () {

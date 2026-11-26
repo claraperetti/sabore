@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'pages/home_page.dart';
+import 'pages/inicio_page.dart';
+import 'services/receitas_service.dart';
 import 'state/favoritos.dart';
 import 'theme.dart';
 
@@ -11,7 +12,10 @@ void main() {
 /// Widget raiz: define nome, tema, a primeira tela e os favoritos
 /// compartilhados por todas as telas.
 class SaboreApp extends StatefulWidget {
-  const SaboreApp({super.key});
+  /// [servico] pode ser trocado nos testes por um que usa dados falsos.
+  const SaboreApp({super.key, this.servico});
+
+  final ReceitasService? servico;
 
   @override
   State<SaboreApp> createState() => _SaboreAppState();
@@ -20,10 +24,12 @@ class SaboreApp extends StatefulWidget {
 class _SaboreAppState extends State<SaboreApp> {
   // Uma única lista de favoritos para o app inteiro.
   final _favoritos = Favoritos();
+  late final ReceitasService _servico = widget.servico ?? ReceitasService();
 
   @override
   void dispose() {
     _favoritos.dispose();
+    _servico.fechar();
     super.dispose();
   }
 
@@ -37,7 +43,7 @@ class _SaboreAppState extends State<SaboreApp> {
       // todas as telas abertas com push() enxergam os favoritos.
       builder: (context, child) =>
           FavoritosScope(favoritos: _favoritos, child: child!),
-      home: const HomePage(),
+      home: InicioPage(servico: _servico),
     );
   }
 }

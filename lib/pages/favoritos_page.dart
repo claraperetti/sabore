@@ -5,41 +5,62 @@ import '../theme.dart';
 import '../widgets/cartao_receita.dart';
 import 'detalhes_page.dart';
 
-/// Lista das receitas favoritadas durante a sessão.
+/// Aba "Favoritos": receitas salvas durante a sessão.
+///
+/// Lê a mesma instância de [Favoritos] que a aba Explorar e os
+/// detalhes usam (fonte única de verdade), então qualquer mudança
+/// aparece em todas as telas na hora.
 class FavoritosPage extends StatelessWidget {
-  const FavoritosPage({super.key});
+  const FavoritosPage({super.key, required this.aoExplorar});
+
+  /// Volta para a aba Explorar.
+  final VoidCallback aoExplorar;
 
   @override
   Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
     final favoritas = FavoritosScope.of(context).itens;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Minhas favoritas')),
-      body: favoritas.isEmpty
-          ? const _SemFavoritas()
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              itemCount: favoritas.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, i) {
-                final receita = favoritas[i];
-                return CartaoReceita(
-                  receita: receita,
-                  aoTocar: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => DetalhesPage(receita: receita),
+    return SafeArea(
+      child: favoritas.isEmpty
+          ? _SemFavoritos(aoExplorar: aoExplorar)
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              children: [
+                Text(
+                  'Favoritos',
+                  style: textos.displaySmall?.copyWith(fontSize: 28),
+                ),
+                const SizedBox(height: 4),
+                Text('Receitas salvas nesta sessão.', style: textos.bodyMedium),
+                const SizedBox(height: 20),
+                for (final receita in favoritas) ...[
+                  CartaoReceita(
+                    receita: receita,
+                    aoTocar: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => DetalhesPage(receita: receita),
+                      ),
                     ),
                   ),
-                );
-              },
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Toque no coração para remover.',
+                  style: textos.bodyMedium,
+                ),
+              ],
             ),
     );
   }
 }
 
-/// Mensagem para quando ainda não há favoritas.
-class _SemFavoritas extends StatelessWidget {
-  const _SemFavoritas();
+/// Mensagem para quando ainda não há favoritos.
+class _SemFavoritos extends StatelessWidget {
+  const _SemFavoritos({required this.aoExplorar});
+
+  final VoidCallback aoExplorar;
 
   @override
   Widget build(BuildContext context) {
@@ -66,17 +87,18 @@ class _SemFavoritas extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Nenhuma favorita ainda', style: textos.titleLarge),
+            Text('Nenhum favorito', style: textos.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'Toque no coração de uma receita para guardá-la aqui. '
-              'Suas favoritas ficam salvas enquanto o app estiver aberto.',
+              'Marque uma receita como favorita para encontrá-la aqui. '
+              'Os favoritos ficam salvos enquanto o app estiver aberto.',
               style: textos.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
+              key: const Key('botaoExplorar'),
+              onPressed: aoExplorar,
               icon: const Icon(Icons.restaurant_menu_rounded),
               label: const Text('Explorar receitas'),
             ),

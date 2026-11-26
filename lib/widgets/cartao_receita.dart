@@ -44,6 +44,26 @@ class CartaoReceita extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(receita.resumo, style: textos.bodyMedium),
+                    if (receita.avaliacaoTexto case final nota?) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 16,
+                            color: AppColors.acafrao,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            nota,
+                            style: textos.bodyMedium?.copyWith(
+                              color: AppColors.terracotaEscuro,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
